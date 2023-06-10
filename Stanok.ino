@@ -13,11 +13,8 @@
 #define LeftButtonPin 8
 #define RightButtonPin 9
 
-void StepperPair :: Off()
-
 // Вычисление задержек 50мкс полупериода одного шага
 // T = (10^6/(nu) * 1/2) / 50us;
-void SetSpeed(unsigned long nu);
 
 inline void BuffClear() // Очистка буфера Serial
 {
@@ -25,54 +22,19 @@ inline void BuffClear() // Очистка буфера Serial
 		Serial.read();
 }
 
-void StepperPair :: Step(int pin) // Функция шага отдельного двигателя
-{  
-	int count;
-	PORTD |= 1<<pin;
-	for (count = time_count; count > 0; count--)
-		_delay_us(default_time_step);
-	
-	PORTD &= ~(1<<pin);
-	for (count = time_count; count > 0; count--)
-		_delay_us(default_time_step);
-}
-
-void StepperPair :: Step() // Функция одновременного шага обоих двигателей
-{   
-	int count;
-	PORTD |= 1 << GuideStepPin;
-	PORTD |= 1 << DrumStepPin;
-	for (count = time_count; count > 0; count--)
-		_delay_us(default_time_step);
-
-	PORTD &= ~(1 << GuideStepPin);
-	PORTD &= ~(1 << DrumStepPin);
-	for (count = time_count; count > 0; count--)
-		_delay_us(default_time_step);
-  
-	StepCount--;
-}
-
-void addCommand(CommandTemplate AddedCommand)
-{
-	CommandTemplate *list;
-	for (list = Commands; *list; list++);
-
-	*list = AddedCommand;
-}
-
 void CheckSerial()
 {
-	static bool ReadValue = false; // Флаг чтения числа
+	static bool ReadValue = false; 		// Флаг чтения числа
 	
-	String Key = "";  // Объявление строки, считывающей команду
-	static int Value = 0;  // Объявление строки, считывающей значение
+	static CommandTemplate *list = 0; 	// Объявление указателя на команду в списке команд
+	String Key = "";  					// Объявление строки, считывающей команду
+	static int Value = 0;  				// Объявление переменной, содержащей вводимое значение
 	
 	if (Serial.available() >= 3 && !ReadValue){
 		for (int i = 0; i < 3; ++i)
 			Key += (char)Serial.read(); // Считывание трехсимвольной команды
 
-		for (CommandTemplate* list = Dvig.Commands; *list; list++){
+		for (list = Dvig.Commands; *list; list++){
 			if (Key == list -> Key && list -> ReadValue){
 				list -> function();
 				BuffClear();
@@ -89,22 +51,19 @@ void CheckSerial()
 		char TempValue = (char) Serial.read();
 		
 		if (TempValue == '.'){
-			Value = max(50,Value);
-			Value = min(1500,Value);
-		    	Dvig.SetSpeed(max(10,Value));
+		    list -> function(Value);
 			BuffClear();
-			Serial.println(Value);
 			ReadValue = false;
 			Value = 0;
 			break;
 		}
 		
 		if (TempValue < '0' || TempValue > '9'){
-		    	Value = 0;
+		    Value = 0;
 			ReadValue = false;
 			BuffClear();
 			Serial.println("Error");
-		    	break;
+		    break;
 		}
 		
 		Value *= 10;
